@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vòng Quay May Mắn</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            flex-direction: column;
+            background: linear-gradient(45deg, #ff6b6b, #ffd700, #00c4ff, #ff1493);
+            background-size: 400% 400%;
+            animation: gradientBG 15s ease infinite;
+            position: relative;
+            overflow: hidden;
+        }
+
+        @keyframes gradientBG {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+
+        .sparkle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background-color: #fff;
+            border-radius: 50%;
+            box-shadow: 0 0 10px rgba(255, 255, 255, 0.8);
+            animation: sparkleFall 5s linear forwards;
+            z-index: 1;
+        }
+
+        @keyframes sparkleFall {
+            to {
+                transform: translateY(100vh) scale(0);
+                opacity: 0;
+            }
+        }
+
+        .container {
+            width: 100%;
+            max-width: 800px;
+            background-color: rgba(255, 255, 255, 0.95);
+            border-radius: 15px;
+            padding: 20px;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.2);
+            text-align: center;
+            z-index: 5;
+        }
+
+        h1 {
+            color: #333;
+            margin-bottom: 20px;
+            text-shadow: 1px 1px 2px rgba(0, 0, 0, 0.1);
+        }
+
+        .wheel-container {
+            position: relative;
+            width: 400px;
+            height: 400px;
+            margin: 0 auto 20px;
+        }
+
+        #wheel {
+            width: 100%;
+            height: 100%;
+            cursor: pointer;
+        }
+
+        #wheel.disabled {
+            cursor: not-allowed;
+        }
+
+        .pointer {
+            position: absolute;
+            top: -15px;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 20px;
+            height: 20px;
+            background-color: #ff0000;
+            clip-path: polygon(50% 100%, 0 0, 100% 0);
+            z-index: 10;
+        }
+
+        .popup {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.7);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            z-index: 100;
+        }
+
+        .popup.hidden {
+            display: none;
+        }
+
+        .popup-content {
+            background-color: #fff;
+            padding: 30px;
+            border-radius: 10px;
+            width: 80%;
+            max-width: 400px;
+            text-align: center;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .popup h2 {
+            margin-top: 0;
+            color: #333;
+        }
+
+        .popup p {
+            font-size: 18px;
+            color: #555;
+        }
+
+        .popup button {
+            padding: 10px 20px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-top: 20px;
+        }
+
+        .confetti {
+            position: fixed;
+            width: 10px;
+            height: 10px;
+            background-color: #f00;
+            border-radius: 50%;
+            top: -10px;
+            z-index: 90;
+            animation: fall 3s linear forwards;
+        }
+
+        @keyframes fall {
+            to {
+                transform: translateY(100vh) rotate(360deg);
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 id="heading">Phần thưởng</h1>
+        <div class="wheel-container">
+            <canvas id="wheel" width="400" height="400"></canvas>
+            <div class="pointer"></div>
+        </div>
+    </div>
+
+    <div id="resultPopup" class="popup hidden">
+        <div class="popup-content">
+            <h2>Chúc mừng!</h2>
+            <p id="resultText">Bạn đã trúng: </p>
+            <button id="continue">Tiếp tục</button>
+        </div>
+    </div>
+
+    <div id="birthdayPopup" class="popup hidden">
+        <div class="popup-content">
+            <h2>Chúc mừng sinh nhật! 🎂</h2>
+            <p id="birthdayMessage">Chúc bạn một ngày sinh nhật thật vui vẻ, tràn đầy hạnh phúc và may mắn! Mong rằng phần thưởng này sẽ mang lại niềm vui cho bạn!</p>
+            <button id="closeBirthdayPopup">Đóng</button>
+        </div>
+    </div>
+
+    <audio id="winSound" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
+
+    <script>
+        // Decode URL parameters
+        function getUrlParams() {
+            const url = new URL(window.location.href);
+            const params = new URLSearchParams(url.search);
+            return params;
+        }
+
+        function decodeBase64(str) {
+            try {
+                return decodeURIComponent(Array.prototype.map.call(atob(str), function(c) {
+                    return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+                }).join(''));
+            } catch(e) {
+                return str;
+            }
+        }
+
+        // Lấy dữ liệu từ URL
+        const params = getUrlParams();
+        let wheelData = {
+            heading: "Phần thưởng",
+            data: "500.000 VND,Rượu vang,200.000 VND,bánh sinh nhật,100.000 VND,30.000 VND,50.000 VND,Cái nịt,20.000 VND,10.000 VND,5.000 VND"
+        };
+
+        if (params.get('d')) {
+            try {
+                const decodedData = decodeBase64(params.get('d'));
+                const parsedData = JSON.parse(decodedData);
+                wheelData = parsedData;
+            } catch (error) {
+                console.error("Couldn't parse data from URL", error);
+            }
+        }
+
+        document.getElementById('heading').textContent = wheelData.heading;
+        const prizes = wheelData.data.split(',');
+        const totalSlices = prizes.length;
+
+        // Tạo màu sắc ngẫu nhiên nhưng đảm bảo đủ tương phản
+        function generateColors(count) {
+            const colors = [];
+            const hueStep = 360 / count;
+            
+            for (let i = 0; i < count; i++) {
+                const hue = i * hueStep;
+                colors.push(`hsl(${hue}, 70%, 60%)`);
+            }
+            return colors;
+        }
+
+        const colors = generateColors(totalSlices);
+        const canvas = document.getElementById('wheel');
+        const ctx = canvas.getContext('2d');
+        const resultPopup = document.getElementById('resultPopup');
+        const resultText = document.getElementById('resultText');
+        const continueButton = document.getElementById('continue');
+        const birthdayPopup = document.getElementById('birthdayPopup');
+        const closeBirthdayPopupButton = document.getElementById('closeBirthdayPopup');
+        const winSound = document.getElementById('winSound');
+
+        const sliceAngle = (2 * Math.PI) / totalSlices;
+        let currentAngle = 0;
+        let spinning = false;
+        let selectedPrize = '';
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const centerRadius = 50;
+        let isHovering = false;
+
+        function drawWheel() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            const radius = canvas.width / 2 - 10;
+
+            for (let i = 0; i < totalSlices; i++) {
+                const startAngle = sliceAngle * i + currentAngle;
+                const endAngle = startAngle + sliceAngle;
+                
+                ctx.beginPath();
+                ctx.moveTo(centerX, centerY);
+                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+                ctx.closePath();
+                ctx.fillStyle = colors[i];
+                ctx.fill();
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 2;
+                ctx.stroke();
+
+                ctx.save();
+                ctx.translate(centerX, centerY);
+                ctx.rotate(startAngle + sliceAngle / 2);
+                ctx.fillStyle = '#fff';
+                ctx.font = 'bold 14px Arial';
+                ctx.textAlign = 'right';
+                ctx.textBaseline = 'middle';
+                ctx.fillText(prizes[i], radius - 50, 0);
+                ctx.restore();
+            }
+
+            ctx.beginPath();
+            ctx.arc(centerX, centerY, centerRadius, 0, 2 * Math.PI);
+            ctx.fillStyle = spinning ? '#cccccc' : (isHovering ? '#e0e0e0' : '#fff');
+            ctx.fill();
+            ctx.strokeStyle = '#ffd700';
+            ctx.lineWidth = 5;
+            ctx.stroke();
+
+            ctx.fillStyle = spinning ? '#666' : '#000';
+            ctx.font = 'bold 24px Arial';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.fillText('QUAY', centerX, centerY);
+        }
+
+        function createConfetti() {
+            const confettiCount = 100;
+            const colors = ['#ff0000', '#00ff00', '#0000ff', '#ffff00', '#ff00ff', '#00ffff'];
+            
+            for (let i = 0; i < confettiCount; i++) {
+                const confetti = document.createElement('div');
+                confetti.className = 'confetti';
+                confetti.style.left = Math.random() * 100 + 'vw';
+                confetti.style.backgroundColor = colors[Math.floor(Math.random() * colors.length)];
+                confetti.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                confetti.style.width = (Math.random() * 8 + 5) + 'px';
+                confetti.style.height = confetti.style.width;
+                
+                document.body.appendChild(confetti);
+                
+                setTimeout(() => {
+                    confetti.remove();
+                }, 5000);
+            }
+        }
+
+        function createSparkles() {
+            const sparkleCount = 50;
+            
+            for (let i = 0; i < sparkleCount; i++) {
+                const sparkle = document.createElement('div');
+                sparkle.className = 'sparkle';
+                sparkle.style.left = Math.random() * 100 + 'vw';
+                sparkle.style.top = Math.random() * 100 + 'vh';
+                sparkle.style.animationDuration = (Math.random() * 3 + 2) + 's';
+                
+                document.body.appendChild(sparkle);
+                
+                setTimeout(() => {
+                    sparkle.remove();
+                }, 5000);
+            }
+        }
+
+        function spinWheel() {
+            if (spinning) return;
+            
+            spinning = true;
+            canvas.classList.add('disabled');
+            resultPopup.classList.add('hidden');
+
+            const spinAngle = Math.random() * 360 + 1800;
+            let spinTime = 0;
+            const spinDuration = 8000;
+            const startAngle = currentAngle;
+            const targetAngle = startAngle + (spinAngle * Math.PI / 180);
+
+            function animate(timestamp) {
+                if (!spinTime) spinTime = timestamp;
+                const elapsed = timestamp - spinTime;
+                const progress = Math.min(elapsed / spinDuration, 1);
+                
+                const easeOutQuint = function(t) {
+                    return 1 - Math.pow(1 - t, 5);
+                };
+                
+                currentAngle = startAngle + (targetAngle - startAngle) * easeOutQuint(progress);
+                drawWheel();
+
+                if (progress < 1) {
+                    requestAnimationFrame(animate);
+                } else {
+                    spinning = false;
+                    canvas.classList.remove('disabled');
+                    showResult();
+                }
+            }
+            
+            requestAnimationFrame(animate);
+        }
+
+        function showResult() {
+            const pointerAngle = 3 * Math.PI / 2;
+            const normalizedAngle = (currentAngle % (2 * Math.PI) + 2 * Math.PI) % (2 * Math.PI);
+            const relativeAngle = (pointerAngle - normalizedAngle + 2 * Math.PI) % (2 * Math.PI);
+            const prizeIndex = Math.floor(relativeAngle / sliceAngle) % totalSlices;
+            
+            selectedPrize = prizes[prizeIndex];
+            resultText.textContent = `Bạn đã trúng: ${selectedPrize}`;
+            resultPopup.classList.remove('hidden');
+            
+            winSound.play();
+            createConfetti();
+
+            // Gửi kết quả quay đến Google Sheets
+            const userResult = {
+                timestamp: new Date().toLocaleString(),
+                prize: selectedPrize
+            };
+
+            fetch('YOUR_GOOGLE_APPS_SCRIPT_URL', {
+                method: 'POST',
+                body: JSON.stringify(userResult),
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(data => console.log('Kết quả đã được gửi:', data))
+            .catch(error => console.error('Lỗi khi gửi kết quả:', error));
+        }
+
+        function showBirthdayMessage() {
+            resultPopup.classList.add('hidden');
+            birthdayPopup.classList.remove('hidden');
+        }
+
+        function closePopup() {
+            resultPopup.classList.add('hidden');
+        }
+
+        function closeBirthdayPopup() {
+            birthdayPopup.classList.add('hidden');
+        }
+
+        canvas.addEventListener('click', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const dx = x - centerX;
+            const dy = y - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            if (distance <= centerRadius) {
+                spinWheel();
+            }
+        });
+
+        canvas.addEventListener('mousemove', (event) => {
+            const rect = canvas.getBoundingClientRect();
+            const x = event.clientX - rect.left;
+            const y = event.clientY - rect.top;
+            const dx = x - centerX;
+            const dy = y - centerY;
+            const distance = Math.sqrt(dx * dx + dy * dy);
+
+            const wasHovering = isHovering;
+            isHovering = distance <= centerRadius && !spinning;
+
+            if (wasHovering !== isHovering) {
+                drawWheel();
+            }
+        });
+
+        canvas.addEventListener('mouseleave', () => {
+            isHovering = false;
+            drawWheel();
+        });
+
+        setInterval(createSparkles, 2000);
+
+        drawWheel();
+        continueButton.addEventListener('click', showBirthdayMessage);
+        closeBirthdayPopupButton.addEventListener('click', closeBirthdayPopup);
+    </script>
+</body>
+</html>
