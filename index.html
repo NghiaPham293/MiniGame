@@ -155,6 +155,24 @@
                 transform: translateY(100vh) rotate(360deg);
             }
         }
+
+        /* Style for when the wheel is used */
+        #wheel.used {
+            opacity: 0.7;
+            filter: grayscale(50%);
+        }
+
+        /* Style for the message that appears when spin is used */
+        .spin-message {
+            display: none;
+            color: #ff0000;
+            font-weight: bold;
+            margin-top: 10px;
+        }
+
+        .spin-message.visible {
+            display: block;
+        }
     </style>
 </head>
 <body>
@@ -164,12 +182,14 @@
             <canvas id="wheel" width="400" height="400"></canvas>
             <div class="pointer"></div>
         </div>
+        <div id="spinMessage" class="spin-message">Bạn đã sử dụng hết lượt quay</div>
     </div>
 
     <div id="resultPopup" class="popup hidden">
         <div class="popup-content">
             <h2>Chúc mừng!</h2>
             <p id="resultText">Bạn đã trúng: </p>
+            <p style="color: #ff0000; font-size: 14px;">Hãy chụp màn hình để nhận thưởng</p>
             <button id="continue">Tiếp tục</button>
         </div>
     </div>
@@ -244,6 +264,7 @@
         const birthdayPopup = document.getElementById('birthdayPopup');
         const closeBirthdayPopupButton = document.getElementById('closeBirthdayPopup');
         const winSound = document.getElementById('winSound');
+        const spinMessage = document.getElementById('spinMessage');
 
         const sliceAngle = (2 * Math.PI) / totalSlices;
         let currentAngle = 0;
@@ -253,6 +274,16 @@
         const centerY = canvas.height / 2;
         const centerRadius = 50;
         let isHovering = false;
+
+        // Check if user has already spun the wheel
+        let hasSpun = localStorage.getItem('hasSpun') === 'true';
+        
+        // Apply used state if already spun
+        if (hasSpun) {
+            canvas.classList.add('used');
+            canvas.classList.add('disabled');
+            spinMessage.classList.add('visible');
+        }
 
         function drawWheel() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
@@ -285,13 +316,13 @@
 
             ctx.beginPath();
             ctx.arc(centerX, centerY, centerRadius, 0, 2 * Math.PI);
-            ctx.fillStyle = spinning ? '#cccccc' : (isHovering ? '#e0e0e0' : '#fff');
+            ctx.fillStyle = (hasSpun || spinning) ? '#cccccc' : (isHovering ? '#e0e0e0' : '#fff');
             ctx.fill();
             ctx.strokeStyle = '#ffd700';
             ctx.lineWidth = 5;
             ctx.stroke();
 
-            ctx.fillStyle = spinning ? '#666' : '#000';
+            ctx.fillStyle = (hasSpun || spinning) ? '#666' : '#000';
             ctx.font = 'bold 24px Arial';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -338,7 +369,7 @@
         }
 
         function spinWheel() {
-            if (spinning) return;
+            if (spinning || hasSpun) return;
             
             spinning = true;
             canvas.classList.add('disabled');
@@ -366,7 +397,11 @@
                     requestAnimationFrame(animate);
                 } else {
                     spinning = false;
-                    canvas.classList.remove('disabled');
+                    // Mark as spun
+                    hasSpun = true;
+                    localStorage.setItem('hasSpun', 'true');
+                    canvas.classList.add('used');
+                    spinMessage.classList.add('visible');
                     showResult();
                 }
             }
@@ -418,7 +453,22 @@
             birthdayPopup.classList.add('hidden');
         }
 
+        // Add a function to reset the spin state (for testing purposes)
+        function resetSpin() {
+            localStorage.removeItem('hasSpun');
+            hasSpun = false;
+            canvas.classList.remove('used');
+            canvas.classList.remove('disabled');
+            spinMessage.classList.remove('visible');
+            drawWheel();
+        }
+
+        // Uncomment this line to add a reset button for testing
+        // window.resetSpin = resetSpin;
+
         canvas.addEventListener('click', (event) => {
+            if (hasSpun) return; // Prevent spinning if already used
+
             const rect = canvas.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
@@ -432,6 +482,8 @@
         });
 
         canvas.addEventListener('mousemove', (event) => {
+            if (hasSpun) return; // Don't change hover state if used
+
             const rect = canvas.getBoundingClientRect();
             const x = event.clientX - rect.left;
             const y = event.clientY - rect.top;
@@ -448,8 +500,10 @@
         });
 
         canvas.addEventListener('mouseleave', () => {
-            isHovering = false;
-            drawWheel();
+            if (!hasSpun) {
+                isHovering = false;
+                drawWheel();
+            }
         });
 
         setInterval(createSparkles, 2000);
