@@ -156,13 +156,11 @@
             }
         }
 
-        /* Style for when the wheel is used */
         #wheel.used {
             opacity: 0.7;
             filter: grayscale(50%);
         }
 
-        /* Style for the message that appears when spin is used */
         .spin-message {
             display: none;
             color: #ff0000;
@@ -173,16 +171,62 @@
         .spin-message.visible {
             display: block;
         }
+
+        .user-info {
+            background-color: rgba(255, 255, 255, 0.8);
+            padding: 5px 10px;
+            border-radius: 10px;
+            font-size: 14px;
+            color: #333;
+            margin-bottom: 10px;
+        }
+
+        .admin-controls {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: #f0f0f0;
+            border-radius: 10px;
+            display: none;
+        }
+
+        .admin-controls.visible {
+            display: block;
+        }
+
+        .admin-controls button {
+            padding: 8px 15px;
+            background-color: #007bff;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 0 5px;
+        }
+
+        .admin-controls input {
+            padding: 8px;
+            border: 1px solid #ccc;
+            border-radius: 5px;
+            margin-right: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container">
         <h1 id="heading">Phần thưởng</h1>
+        <div id="userInfo" class="user-info"></div>
         <div class="wheel-container">
             <canvas id="wheel" width="400" height="400"></canvas>
             <div class="pointer"></div>
         </div>
         <div id="spinMessage" class="spin-message">Bạn đã sử dụng hết lượt quay</div>
+        
+        <div id="adminControls" class="admin-controls">
+            <h3>Quản lý người dùng</h3>
+            <input type="text" id="userIdInput" placeholder="Nhập ID người dùng">
+            <button id="resetUserBtn">Đặt lại lượt quay</button>
+            <button id="toggleAdminBtn">Đóng</button>
+        </div>
     </div>
 
     <div id="resultPopup" class="popup hidden">
@@ -197,7 +241,9 @@
     <div id="birthdayPopup" class="popup hidden">
         <div class="popup-content">
             <h2>Chúc mừng sinh nhật! 🎂</h2>
-            <p id="birthdayMessage">Chúc bạn một ngày sinh nhật thật vui vẻ, tràn đầy hạnh phúc và may mắn! Mong rằng phần thưởng này sẽ mang lại niềm vui cho bạn!</p>
+            <p id="birthdayMessage">Nhân dịp sinh nhật của bạn, Công ty Khả Doanh xin gửi đến bạn những lời chúc tốt đẹp nhất! 🎉🎂
+
+                Chúng tôi trân trọng những đóng góp và cống hiến của bạn trong suốt thời gian qua. Chúc bạn có một ngày sinh nhật thật vui vẻ, tràn đầy hạnh phúc bên gia đình, bạn bè và đồng nghiệp. Hy vọng trong năm tuổi mới, bạn sẽ luôn giữ được nhiệt huyết, thành công trong công việc và đạt được nhiều thành tựu trong cuộc sống.</p>
             <button id="closeBirthdayPopup">Đóng</button>
         </div>
     </div>
@@ -205,7 +251,6 @@
     <audio id="winSound" src="https://assets.mixkit.co/active_storage/sfx/951/951-preview.mp3"></audio>
 
     <script>
-        // Decode URL parameters
         function getUrlParams() {
             const url = new URL(window.location.href);
             const params = new URLSearchParams(url.search);
@@ -222,11 +267,11 @@
             }
         }
 
-        // Lấy dữ liệu từ URL
         const params = getUrlParams();
         let wheelData = {
             heading: "Phần thưởng",
-            data: "500.000 VND,Rượu vang,200.000 VND,bánh sinh nhật,100.000 VND,30.000 VND,50.000 VND,Cái nịt,20.000 VND,10.000 VND,5.000 VND"
+            // Chỉnh sửa thành 8 phần thưởng
+            data: "300.000 VND,100.000 VND,Thùng bia,50.000 VND,Bình giữ nhiệt,6 chai Revive,Bánh sinh nhật"
         };
 
         if (params.get('d')) {
@@ -239,11 +284,13 @@
             }
         }
 
+        let userId = params.get('user') || 'user_' + Math.random().toString(36).substring(2, 10);
+        document.getElementById('userInfo').textContent = 'ID: ' + userId;
+
         document.getElementById('heading').textContent = wheelData.heading;
         const prizes = wheelData.data.split(',');
         const totalSlices = prizes.length;
 
-        // Tạo màu sắc ngẫu nhiên nhưng đảm bảo đủ tương phản
         function generateColors(count) {
             const colors = [];
             const hueStep = 360 / count;
@@ -265,6 +312,10 @@
         const closeBirthdayPopupButton = document.getElementById('closeBirthdayPopup');
         const winSound = document.getElementById('winSound');
         const spinMessage = document.getElementById('spinMessage');
+        const adminControls = document.getElementById('adminControls');
+        const userIdInput = document.getElementById('userIdInput');
+        const resetUserBtn = document.getElementById('resetUserBtn');
+        const toggleAdminBtn = document.getElementById('toggleAdminBtn');
 
         const sliceAngle = (2 * Math.PI) / totalSlices;
         let currentAngle = 0;
@@ -275,10 +326,24 @@
         const centerRadius = 50;
         let isHovering = false;
 
-        // Check if user has already spun the wheel
-        let hasSpun = localStorage.getItem('hasSpun') === 'true';
+        const isAdmin = params.get('admin') === 'true';
+        if (isAdmin) {
+            adminControls.classList.add('visible');
+        }
+
+        function getUserSpinStatus(id) {
+            const spunUsers = JSON.parse(localStorage.getItem('spunUsers') || '{}');
+            return spunUsers[id] === true;
+        }
+
+        function setUserSpinStatus(id, status) {
+            const spunUsers = JSON.parse(localStorage.getItem('spunUsers') || '{}');
+            spunUsers[id] = status;
+            localStorage.setItem('spunUsers', JSON.stringify(spunUsers));
+        }
+
+        let hasSpun = getUserSpinStatus(userId);
         
-        // Apply used state if already spun
         if (hasSpun) {
             canvas.classList.add('used');
             canvas.classList.add('disabled');
@@ -321,6 +386,8 @@
             ctx.strokeStyle = '#ffd700';
             ctx.lineWidth = 5;
             ctx.stroke();
+
+            
 
             ctx.fillStyle = (hasSpun || spinning) ? '#666' : '#000';
             ctx.font = 'bold 24px Arial';
@@ -397,9 +464,8 @@
                     requestAnimationFrame(animate);
                 } else {
                     spinning = false;
-                    // Mark as spun
                     hasSpun = true;
-                    localStorage.setItem('hasSpun', 'true');
+                    setUserSpinStatus(userId, true);
                     canvas.classList.add('used');
                     spinMessage.classList.add('visible');
                     showResult();
@@ -422,22 +488,24 @@
             winSound.play();
             createConfetti();
 
-            // Gửi kết quả quay đến Google Sheets
             const userResult = {
                 timestamp: new Date().toLocaleString(),
+                userId: userId,
                 prize: selectedPrize
             };
 
-            fetch('YOUR_GOOGLE_APPS_SCRIPT_URL', {
-                method: 'POST',
-                body: JSON.stringify(userResult),
-                headers: {
-                    'Content-Type': 'application/json'
-                }
-            })
-            .then(response => response.json())
-            .then(data => console.log('Kết quả đã được gửi:', data))
-            .catch(error => console.error('Lỗi khi gửi kết quả:', error));
+            if (typeof YOUR_GOOGLE_APPS_SCRIPT_URL !== 'undefined' && YOUR_GOOGLE_APPS_SCRIPT_URL) {
+                fetch(YOUR_GOOGLE_APPS_SCRIPT_URL, {
+                    method: 'POST',
+                    body: JSON.stringify(userResult),
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                .then(response => response.json())
+                .then(data => console.log('Kết quả đã được gửi:', data))
+                .catch(error => console.error('Lỗi khi gửi kết quả:', error));
+            }
         }
 
         function showBirthdayMessage() {
@@ -453,21 +521,40 @@
             birthdayPopup.classList.add('hidden');
         }
 
-        // Add a function to reset the spin state (for testing purposes)
-        function resetSpin() {
-            localStorage.removeItem('hasSpun');
-            hasSpun = false;
-            canvas.classList.remove('used');
-            canvas.classList.remove('disabled');
-            spinMessage.classList.remove('visible');
-            drawWheel();
+        function resetUserSpin(id) {
+            const spunUsers = JSON.parse(localStorage.getItem('spunUsers') || '{}');
+            if (spunUsers[id]) {
+                delete spunUsers[id];
+                localStorage.setItem('spunUsers', JSON.stringify(spunUsers));
+                
+                if (id === userId) {
+                    hasSpun = false;
+                    canvas.classList.remove('used');
+                    canvas.classList.remove('disabled');
+                    spinMessage.classList.remove('visible');
+                    drawWheel();
+                }
+                
+                return true;
+            }
+            return false;
         }
 
-        // Uncomment this line to add a reset button for testing
-        // window.resetSpin = resetSpin;
+        resetUserBtn.addEventListener('click', function() {
+            const targetUserId = userIdInput.value.trim() || userId;
+            if (resetUserSpin(targetUserId)) {
+                alert(`Đã đặt lại lượt quay cho người dùng: ${targetUserId}`);
+            } else {
+                alert(`Người dùng ${targetUserId} chưa quay hoặc không tồn tại`);
+            }
+        });
+
+        toggleAdminBtn.addEventListener('click', function() {
+            adminControls.classList.toggle('visible');
+        });
 
         canvas.addEventListener('click', (event) => {
-            if (hasSpun) return; // Prevent spinning if already used
+            if (hasSpun) return;
 
             const rect = canvas.getBoundingClientRect();
             const x = event.clientX - rect.left;
@@ -482,7 +569,7 @@
         });
 
         canvas.addEventListener('mousemove', (event) => {
-            if (hasSpun) return; // Don't change hover state if used
+            if (hasSpun) return;
 
             const rect = canvas.getBoundingClientRect();
             const x = event.clientX - rect.left;
@@ -509,8 +596,16 @@
         setInterval(createSparkles, 2000);
 
         drawWheel();
+        
         continueButton.addEventListener('click', showBirthdayMessage);
         closeBirthdayPopupButton.addEventListener('click', closeBirthdayPopup);
+
+        window.addEventListener('beforeunload', function() {
+            if (hasSpun) {
+                resultPopup.classList.add('hidden');
+                birthdayPopup.classList.add('hidden');
+            }
+        });
     </script>
 </body>
 </html>
