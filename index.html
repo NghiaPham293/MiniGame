@@ -243,7 +243,8 @@
             <h2>Chúc mừng sinh nhật! 🎂</h2>
             <p id="birthdayMessage">Nhân dịp sinh nhật của bạn, Công ty Khả Doanh xin gửi đến bạn những lời chúc tốt đẹp nhất! 🎉🎂
 
-                Chúng tôi trân trọng những đóng góp và cống hiến của bạn trong suốt thời gian qua. Chúc bạn có một ngày sinh nhật thật vui vẻ, tràn đầy hạnh phúc bên gia đình, bạn bè và đồng nghiệp. Hy vọng trong năm tuổi mới, bạn sẽ luôn giữ được nhiệt huyết, thành công trong công việc và đạt được nhiều thành tựu trong cuộc sống.</p>
+                Chúng tôi trân trọng những đóng góp và cống hiến của bạn trong suốt thời gian qua. Chúc bạn có một ngày sinh nhật thật vui vẻ, tràn đầy hạnh phúc bên gia đình, bạn bè và đồng nghiệp. Hy vọng trong năm tuổi mới, bạn sẽ luôn giữ được nhiệt huyết,
+                 thành công trong công việc và đạt được nhiều thành tựu trong cuộc sống.</p>
             <button id="closeBirthdayPopup">Đóng</button>
         </div>
     </div>
@@ -270,8 +271,7 @@
         const params = getUrlParams();
         let wheelData = {
             heading: "Phần thưởng",
-            // Chỉnh sửa thành 8 phần thưởng
-            data: "300.000 VND,100.000 VND,Thùng bia,50.000 VND,Bình giữ nhiệt,6 chai Revive,Bánh sinh nhật"
+            data: "300.000 VND,100.000 VND,Thùng bia,50.000 VND,Bình giữ nhiệt,6 chai Revive,Bánh sinh nhật,12 chai wakeup"
         };
 
         if (params.get('d')) {
@@ -291,18 +291,18 @@
         const prizes = wheelData.data.split(',');
         const totalSlices = prizes.length;
 
-        function generateColors(count) {
-            const colors = [];
-            const hueStep = 360 / count;
-            
-            for (let i = 0; i < count; i++) {
-                const hue = i * hueStep;
-                colors.push(`hsl(${hue}, 70%, 60%)`);
-            }
-            return colors;
-        }
+        // Định nghĩa mảng màu cố định cho 8 ô
+        const colors = [
+            '#FFFF00', // Vàng
+            '#00FF00', // Xanh lá
+            '#FF69B4', // Hồng     
+            '#0000FF', // Xanh dương
+            '#E91152', // do cam
+            '#FFA500', // Cam
+            '#00CED1',  // Xanh lam
+            '#FF0000', // Đỏ
+        ];
 
-        const colors = generateColors(totalSlices);
         const canvas = document.getElementById('wheel');
         const ctx = canvas.getContext('2d');
         const resultPopup = document.getElementById('resultPopup');
@@ -351,50 +351,50 @@
         }
 
         function drawWheel() {
-            ctx.clearRect(0, 0, canvas.width, canvas.height);
-            const radius = canvas.width / 2 - 10;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    const radius = canvas.width / 2 - 10;
 
-            for (let i = 0; i < totalSlices; i++) {
-                const startAngle = sliceAngle * i + currentAngle;
-                const endAngle = startAngle + sliceAngle;
-                
-                ctx.beginPath();
-                ctx.moveTo(centerX, centerY);
-                ctx.arc(centerX, centerY, radius, startAngle, endAngle);
-                ctx.closePath();
-                ctx.fillStyle = colors[i];
-                ctx.fill();
-                ctx.strokeStyle = '#fff';
-                ctx.lineWidth = 2;
-                ctx.stroke();
+    for (let i = 0; i < totalSlices; i++) {
+        const startAngle = sliceAngle * i + currentAngle;
+        const endAngle = startAngle + sliceAngle;
+        
+        ctx.beginPath();
+        ctx.moveTo(centerX, centerY);
+        ctx.arc(centerX, centerY, radius, startAngle, endAngle);
+        ctx.closePath();
+        ctx.fillStyle = colors[i];
+        ctx.fill();
+        ctx.strokeStyle = '#fff';
+        ctx.lineWidth = 2;
+        ctx.stroke();
 
-                ctx.save();
-                ctx.translate(centerX, centerY);
-                ctx.rotate(startAngle + sliceAngle / 2);
-                ctx.fillStyle = '#fff';
-                ctx.font = 'bold 14px Arial';
-                ctx.textAlign = 'right';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(prizes[i], radius - 15, 0);
-                ctx.restore();
-            }
+        ctx.save();
+        ctx.translate(centerX, centerY);
+        ctx.rotate(startAngle + sliceAngle / 2);
+        // Sử dụng màu chữ so le: đen cho ô chẵn, trắng cho ô lẻ
+        ctx.fillStyle = i % 2 === 0 ? '#000000' : '#000000';
+        ctx.font = 'bold 14px Arial';
+        ctx.textAlign = 'right';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(prizes[i], radius - 15, 0);
+        ctx.restore();
+    }
 
-            ctx.beginPath();
-            ctx.arc(centerX, centerY, centerRadius, 0, 2 * Math.PI);
-            ctx.fillStyle = (hasSpun || spinning) ? '#cccccc' : (isHovering ? '#e0e0e0' : '#fff');
-            ctx.fill();
-            ctx.strokeStyle = '#ffd700';
-            ctx.lineWidth = 5;
-            ctx.stroke();
+    // Phần còn lại của hàm giữ nguyên
+    ctx.beginPath();
+    ctx.arc(centerX, centerY, centerRadius, 0, 2 * Math.PI);
+    ctx.fillStyle = (hasSpun || spinning) ? '#cccccc' : (isHovering ? '#e0e0e0' : '#fff');
+    ctx.fill();
+    ctx.strokeStyle = '#ffd700';
+    ctx.lineWidth = 5;
+    ctx.stroke();
 
-            
-
-            ctx.fillStyle = (hasSpun || spinning) ? '#666' : '#000';
-            ctx.font = 'bold 24px Arial';
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText('QUAY', centerX, centerY);
-        }
+    ctx.fillStyle = (hasSpun || spinning) ? '#666' : '#000';
+    ctx.font = 'bold 24px Arial';
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.fillText('QUAY', centerX, centerY);
+}
 
         function createConfetti() {
             const confettiCount = 100;
